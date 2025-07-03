@@ -1,0 +1,36 @@
+# Render.com deployment configuration
+services:
+  # API Web Service
+  - type: web
+    name: swipehire-api
+    env: node
+    plan: free  # Use 'starter' for production
+    buildCommand: cd api && npm install
+    startCommand: cd api && npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: FRONTEND_URL
+        value: https://swipehire.vercel.app
+      - key: SUPABASE_URL
+        sync: false  # Set manually in Render dashboard
+      - key: SUPABASE_ANON_KEY
+        sync: false  # Set manually in Render dashboard  
+      - key: JWT_SECRET
+        generateValue: true  # Auto-generate secure secret
+
+  # Background Scraper Worker (will create this later)
+  # - type: worker
+  #   name: swipehire-scraper
+  #   env: python
+  #   plan: free
+  #   buildCommand: cd scraper && pip install -r requirements.txt
+  #   startCommand: cd scraper && python main.py
+  #   envVars:
+  #     - key: SUPABASE_URL
+  #       sync: false
+  #     - key: SUPABASE_ANON_KEY
+  #       sync: false
