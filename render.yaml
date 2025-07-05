@@ -22,15 +22,24 @@ services:
       - key: JWT_SECRET
         generateValue: true  # Auto-generate secure secret
 
-  # Background Scraper Worker (will create this later)
-  # - type: worker
-  #   name: swipehire-scraper
-  #   env: python
-  #   plan: free
-  #   buildCommand: cd scraper && pip install -r requirements.txt
-  #   startCommand: cd scraper && python main.py
-  #   envVars:
-  #     - key: SUPABASE_URL
-  #       sync: false
-  #     - key: SUPABASE_ANON_KEY
-  #       sync: false
+  # Background Scraper Worker
+  - type: worker
+    name: swipehire-scraper
+    env: docker
+    plan: free
+    dockerfilePath: ./scraper/Dockerfile
+    envVars:
+      - key: SUPABASE_URL
+        sync: false  # Set manually in Render dashboard
+      - key: SUPABASE_ANON_KEY
+        sync: false  # Set manually in Render dashboard
+      - key: CITIES
+        value: vancouver,toronto,calgary
+      - key: SCRAPE_INTERVAL_HOURS
+        value: 6
+      - key: MAX_JOBS_PER_CITY
+        value: 25
+      - key: DEBUG
+        value: false
+      - key: RUN_ONCE
+        value: false

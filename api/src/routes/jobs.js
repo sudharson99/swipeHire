@@ -4,6 +4,55 @@ const { validateCity } = require('../middleware/validation');
 
 const router = express.Router();
 
+// Admin endpoint to add jobs (for testing)
+router.post('/', async (req, res) => {
+  try {
+    // Simple admin key check
+    const adminKey = req.headers['x-admin-key'];
+    if (adminKey !== 'swipehire-admin-2025') {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized - Admin key required'
+      });
+    }
+
+    const jobData = {
+      ...req.body,
+      scraped_at: new Date().toISOString(),
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    // Validate required fields
+    const required = ['title', 'company', 'location', 'city', 'description'];
+    for (const field of required) {
+      if (!jobData[field]) {
+        return res.status(400).json({
+          success: false,
+          message: `Missing required field: ${field}`
+        });
+      }
+    }
+
+    const job = await db.createJob(jobData);
+
+    res.status(201).json({
+      success: true,
+      message: 'Job created successfully',
+      job: job
+    });
+
+  } catch (error) {
+    console.error('Error creating job:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create job',
+      error: error.message
+    });
+  }
+});
+
 // Get jobs for swiping
 router.get('/', validateCity, async (req, res) => {
   try {

@@ -1,0 +1,42 @@
+name: Daily Job Scraper
+
+on:
+  schedule:
+    # Run daily at 8 AM UTC (3 AM EST, 12 AM PST)
+    - cron: '0 8 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  scrape-jobs:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        cd scraper
+        pip install -r requirements.txt
+        
+    - name: Run job scraper
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        CITIES: vancouver,toronto,calgary
+        MAX_JOBS_PER_CITY: 15
+        RUN_ONCE: true
+        DEBUG: false
+      run: |
+        cd scraper
+        python main.py
+        
+    - name: Log completion
+      run: |
+        echo "✅ Job scraping completed at $(date)"
+        echo "🔍 Check your API: https://swipehire-api.onrender.com/api/jobs"
