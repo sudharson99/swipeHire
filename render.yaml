@@ -38,7 +38,7 @@ services:
       - key: SCRAPE_INTERVAL_HOURS
         value: 6
       - key: MAX_JOBS_PER_CITY
-        value: 25
+        value: 100
       - key: DEBUG
         value: false
       - key: RUN_ONCE

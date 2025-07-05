@@ -68,7 +68,7 @@ class CraigslistScraper:
             self.logger.error(f"Failed to setup Chrome driver: {str(e)}")
             raise
 
-    def scrape_jobs(self, city: str, max_jobs: int = 50) -> List[Dict]:
+    def scrape_jobs(self, city: str, max_jobs: int = 100) -> List[Dict]:
         """Scrape jobs from Craigslist for a specific city"""
         if city not in self.base_urls:
             self.logger.error(f"❌ City {city} not supported")
@@ -78,11 +78,40 @@ class CraigslistScraper:
         jobs = []
         
         try:
-            # Get job listings from multiple categories
-            categories = ['jjj']  # All jobs category
+            # Get job listings from ALL categories - no filtering
+            categories = [
+                'jjj',  # All jobs
+                'acc',  # Accounting/Finance
+                'csr',  # Customer Service
+                'eng',  # Engineering
+                'edu',  # Education
+                'foo',  # Food/Hospitality
+                'sls',  # Sales/Marketing
+                'sad',  # Admin/Office
+                'ret',  # Retail/Wholesale
+                'lab',  # General Labor
+                'trd',  # Skilled Trade/Craft
+                'tch',  # Technical Support
+                'web',  # Web/Info Design
+                'hth',  # Healthcare
+                'med',  # Medical/Health
+                'sci',  # Science/Biotech
+                'bus',  # Business/Management
+                'gov',  # Government
+                'npo',  # Nonprofit
+                'sec',  # Security
+                'trp',  # Transportation
+                'art',  # Arts/Media/Design
+                'tfr',  # TV/Film/Radio
+                'wri',  # Writing/Editing
+                'lgl',  # Legal/Paralegal
+                'spa',  # Salon/Spa/Fitness
+                'etc'   # Et cetera
+            ]
             
             for category in categories:
-                category_jobs = self._scrape_category(base_url, category, max_jobs)
+                self.logger.info(f"🔍 Scraping category: {category}")
+                category_jobs = self._scrape_category(base_url, category, max_jobs // len(categories))
                 jobs.extend(category_jobs)
                 
                 if len(jobs) >= max_jobs:
