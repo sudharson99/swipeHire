@@ -30,8 +30,8 @@ class CraigslistJobScraper:
         # Set Chrome binary location for production vs local
         import os
         if "/app" in os.getcwd() or os.getenv('RENDER'):  # Production environment
-            chrome_options.binary_location = "/usr/bin/google-chrome"
-            service = Service("/usr/local/bin/chromedriver")
+            chrome_options.binary_location = "/usr/bin/google-chrome-stable"
+            service = Service("/usr/bin/chromedriver")
         else:  # Local development
             chrome_options.binary_location = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
             try:
@@ -44,7 +44,13 @@ class CraigslistJobScraper:
             self.driver = webdriver.Chrome(service=service, options=chrome_options)
         except Exception as e:
             print(f"Chrome setup failed: {e}")
-            raise
+            # Try alternative paths
+            if "/app" in os.getcwd() or os.getenv('RENDER'):
+                try:
+                    service = Service("/usr/local/bin/chromedriver")
+                    self.driver = webdriver.Chrome(service=service, options=chrome_options)
+                except:
+                    raise Exception("Failed to initialize Chrome on Render")
         self.wait = WebDriverWait(self.driver, 10)
     
     def scrape_jobs(self, city="sfbay", category="jjj", max_pages=3):
