@@ -44,25 +44,16 @@ class SwipeHire {
 
         const cardContainer = document.getElementById('cardContainer');
 
-        cardContainer.addEventListener('mousedown', this.handleStart.bind(this));
-        cardContainer.addEventListener('touchstart', this.handleStart.bind(this));
-        
-        document.addEventListener('mousemove', this.handleMove.bind(this));
-        document.addEventListener('touchmove', this.handleMove.bind(this));
-        
-        document.addEventListener('mouseup', this.handleEnd.bind(this));
-        document.addEventListener('touchend', this.handleEnd.bind(this));
-
-        function handleStart(e) {
+        const handleStart = (e) => {
             card = e.target.closest('.job-card');
             if (!card) return;
 
             isDragging = true;
             startX = e.type === 'mousedown' ? e.clientX : e.touches[0].clientX;
             card.classList.add('dragging');
-        }
+        };
 
-        function handleMove(e) {
+        const handleMove = (e) => {
             if (!isDragging || !card) return;
 
             currentX = e.type === 'mousemove' ? e.clientX : e.touches[0].clientX;
@@ -71,9 +62,9 @@ class SwipeHire {
 
             card.style.transform = `translateX(${deltaX}px) rotate(${rotation}deg)`;
             card.style.opacity = Math.max(0.5, 1 - Math.abs(deltaX) / 200);
-        }
+        };
 
-        function handleEnd() {
+        const handleEnd = () => {
             if (!isDragging || !card) return;
 
             const deltaX = currentX - startX;
@@ -94,12 +85,16 @@ class SwipeHire {
             isDragging = false;
             card.classList.remove('dragging');
             card = null;
-        }
+        };
 
-        // Bind methods to preserve 'this' context
-        this.handleStart = handleStart.bind(this);
-        this.handleMove = handleMove.bind(this);
-        this.handleEnd = handleEnd.bind(this);
+        cardContainer.addEventListener('mousedown', handleStart);
+        cardContainer.addEventListener('touchstart', handleStart);
+        
+        document.addEventListener('mousemove', handleMove);
+        document.addEventListener('touchmove', handleMove);
+        
+        document.addEventListener('mouseup', handleEnd);
+        document.addEventListener('touchend', handleEnd);
     }
 
     async loadJobs() {
