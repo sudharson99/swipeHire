@@ -4,7 +4,7 @@ class SwipeHire {
         this.currentJobIndex = 0;
         this.currentCity = 'vancouver';
         this.isLoading = false;
-        this.apiUrl = 'http://localhost:3000/api';
+        this.apiUrl = 'https://swipehire-api.onrender.com/api';
         
         this.init();
     }
