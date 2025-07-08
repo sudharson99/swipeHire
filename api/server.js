@@ -17,7 +17,11 @@ const PORT = process.env.PORT || 10000;
 // Security middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.FRONTEND_URL || ['http://localhost:3000', 'https://swipehire.vercel.app'],
+  origin: process.env.FRONTEND_URL || [
+    'http://localhost:3000', 
+    'https://swipehire.vercel.app',
+    'https://swipehire-frontend.onrender.com'
+  ],
   credentials: true
 }));
 
