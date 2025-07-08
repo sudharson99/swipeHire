@@ -13,12 +13,8 @@ services:
         value: production
       - key: PORT
         value: 10000
-      - key: FRONTEND_URL
-        value: https://swipehire.vercel.app
-      - key: SUPABASE_URL
+      - key: DATABASE_URL
         sync: false  # Set manually in Render dashboard
-      - key: SUPABASE_ANON_KEY
-        sync: false  # Set manually in Render dashboard  
       - key: JWT_SECRET
         generateValue: true  # Auto-generate secure secret
 
@@ -29,9 +25,7 @@ services:
     plan: free
     dockerfilePath: ./scraper/Dockerfile
     envVars:
-      - key: SUPABASE_URL
-        sync: false  # Set manually in Render dashboard
-      - key: SUPABASE_ANON_KEY
+      - key: DATABASE_URL
         sync: false  # Set manually in Render dashboard
       - key: CITIES
         value: vancouver,toronto,calgary

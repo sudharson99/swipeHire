@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SwipeHire - Find Your Next Job</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app">
+        <header class="header">
+            <h1>SwipeHire</h1>
+            <div class="city-selector">
+                <select id="citySelect">
+                    <option value="vancouver">Vancouver</option>
+                    <option value="toronto">Toronto</option>
+                    <option value="calgary">Calgary</option>
+                </select>
+            </div>
+        </header>
+
+        <main class="main">
+            <div class="card-container" id="cardContainer">
+                <!-- Job cards will be dynamically inserted here -->
+            </div>
+            
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Loading jobs...</p>
+            </div>
+            
+            <div class="no-jobs" id="noJobs" style="display: none;">
+                <h2>No more jobs available</h2>
+                <p>Check back later for new opportunities!</p>
+            </div>
+        </main>
+
+        <div class="action-buttons">
+            <button class="btn-pass" id="passBtn">Pass</button>
+            <button class="btn-apply" id="applyBtn">Apply</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
