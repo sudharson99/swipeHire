@@ -57,11 +57,18 @@ class JobScraperWorker:
                     max_jobs=self.max_jobs_per_city
                 )
                 
-                # Save jobs to database
+                # Save jobs to database in batches to avoid connection issues
                 jobs_added = 0
-                for job in jobs:
-                    if self.db.save_job(job):
-                        jobs_added += 1
+                batch_size = 5
+                
+                for i in range(0, len(jobs), batch_size):
+                    batch = jobs[i:i + batch_size]
+                    batch_saved = self._save_job_batch(batch)
+                    jobs_added += batch_saved
+                    
+                    # Wait between batches to avoid overwhelming connection
+                    if i + batch_size < len(jobs):
+                        time.sleep(5)
                 
                 total_jobs_added += jobs_added
                 
@@ -91,6 +98,25 @@ class JobScraperWorker:
         # Clean up old jobs (older than 30 days)
         self.cleanup_old_jobs()
 
+    def _save_job_batch(self, jobs: List[Dict]) -> int:
+        """Save a batch of jobs with better error handling"""
+        saved_count = 0
+        
+        for job in jobs:
+            try:
+                if self.db.save_job(job):
+                    saved_count += 1
+                    self.logger.info(f"✅ Saved: {job['title'][:30]}...")
+                
+                # Small delay between individual saves
+                time.sleep(1)
+                
+            except Exception as e:
+                self.logger.warning(f"⚠️  Failed to save job: {job.get('title', 'Unknown')[:30]} - {str(e)}")
+                continue
+        
+        return saved_count
+    
     def cleanup_old_jobs(self) -> None:
         """Remove jobs older than 30 days"""
         try:
