@@ -13,7 +13,7 @@ from typing import List, Dict, Optional
 from dotenv import load_dotenv
 
 from src.scrapers.simple_scraper import SimpleJobScraper
-from src.database.supabase_client import SupabaseClient
+from src.database.postgres_client import PostgresClient
 from src.utils.logger import setup_logger
 
 # Load environment variables
@@ -22,7 +22,7 @@ load_dotenv()
 class JobScraperWorker:
     def __init__(self):
         self.logger = setup_logger()
-        self.db = SupabaseClient()
+        self.db = PostgresClient()
         self.scrapers = {
             'craigslist': SimpleJobScraper()
         }
@@ -57,20 +57,11 @@ class JobScraperWorker:
                     max_jobs=self.max_jobs_per_city
                 )
                 
-                # For now, save jobs to file and try database as backup
+                # Save jobs to PostgreSQL database
                 jobs_added = 0
-                
-                # Save to JSON file as backup
-                self._save_jobs_to_file(jobs, city)
-                
-                # Try to save to database (may fail on Render)
                 for job in jobs:
-                    try:
-                        if self.db.save_job(job):
-                            jobs_added += 1
-                        time.sleep(0.5)  # Slower saves
-                    except:
-                        continue  # Skip failed saves silently
+                    if self.db.save_job(job):
+                        jobs_added += 1
                 
                 total_jobs_added += jobs_added
                 
