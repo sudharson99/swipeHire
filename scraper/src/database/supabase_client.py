@@ -4,6 +4,7 @@ Handles all database operations for job scraping
 """
 
 import os
+import time
 import uuid
 from datetime import datetime
 from typing import List, Dict, Optional
@@ -27,33 +28,43 @@ class SupabaseClient:
 
     def save_job(self, job_data: Dict) -> bool:
         """Save a job to the database, avoiding duplicates"""
-        try:
-            # Check if job already exists (by URL)
-            existing = self.supabase.table('jobs').select('id').eq('job_url', job_data['job_url']).execute()
-            
-            if existing.data:
-                # Job already exists, skip
-                return False
-            
-            # Add timestamp
-            job_data['scraped_at'] = datetime.now().isoformat()
-            job_data['created_at'] = datetime.now().isoformat()
-            job_data['updated_at'] = datetime.now().isoformat()
-            job_data['is_active'] = True
-            
-            # Insert new job
-            result = self.supabase.table('jobs').insert(job_data).execute()
-            
-            if result.data:
-                self.logger.debug(f"✅ Saved job: {job_data['title']}")
-                return True
-            else:
-                self.logger.warning(f"⚠️  Failed to save job: {job_data['title']}")
-                return False
+        max_retries = 3
+        
+        for attempt in range(max_retries):
+            try:
+                # Check if job already exists (by URL)
+                existing = self.supabase.table('jobs').select('id').eq('job_url', job_data['job_url']).execute()
                 
-        except Exception as e:
-            self.logger.error(f"❌ Error saving job: {str(e)}")
-            return False
+                if existing.data:
+                    # Job already exists, skip
+                    return False
+                
+                # Add timestamp
+                job_data['scraped_at'] = datetime.now().isoformat()
+                job_data['created_at'] = datetime.now().isoformat()
+                job_data['updated_at'] = datetime.now().isoformat()
+                job_data['is_active'] = True
+                
+                # Insert new job
+                result = self.supabase.table('jobs').insert(job_data).execute()
+                
+                if result.data:
+                    self.logger.debug(f"✅ Saved job: {job_data['title']}")
+                    return True
+                else:
+                    self.logger.warning(f"⚠️  Failed to save job: {job_data['title']}")
+                    return False
+                    
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    self.logger.warning(f"⚠️  Retry {attempt + 1} for job: {job_data.get('title', 'Unknown')} - {str(e)}")
+                    time.sleep(2)  # Wait before retry
+                    continue
+                else:
+                    self.logger.error(f"❌ Failed to save job after {max_retries} attempts: {str(e)}")
+                    return False
+        
+        return False
 
     def log_scrape_start(self, portal_name: str, city: str) -> str:
         """Log the start of a scraping session"""
