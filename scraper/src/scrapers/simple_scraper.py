@@ -80,16 +80,11 @@ class SimpleJobScraper:
             
             soup = BeautifulSoup(response.content, 'html.parser')
             
-            # Find job listings using multiple selectors
-            job_links = soup.find_all('a', class_='result-title')
+            # Find job listings using working selector
+            job_links = soup.find_all('a', href=re.compile(r'.*\.html$'))
             
-            if not job_links:
-                # Try alternative selectors
-                job_links = soup.find_all('a', href=re.compile(r'/\w+/\d+\.html'))
-                
-            if not job_links:
-                # Try another selector for newer Craigslist format
-                job_links = soup.find_all('a', class_='cl-app-anchor')
+            # Filter to only job listing links (exclude other .html links)
+            job_links = [link for link in job_links if '/d/' in link.get('href', '')]
             
             self.logger.info(f"🔗 Found {len(job_links)} job links in {category}")
             
