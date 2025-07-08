@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from dotenv import load_dotenv
 
-from src.scrapers.craigslist_scraper import CraigslistJobScraper
+from src.scrapers.simple_scraper import SimpleJobScraper
 from src.database.supabase_client import SupabaseClient
 from src.utils.logger import setup_logger
 
@@ -24,7 +24,7 @@ class JobScraperWorker:
         self.logger = setup_logger()
         self.db = SupabaseClient()
         self.scrapers = {
-            'craigslist': CraigslistJobScraper(headless=True)
+            'craigslist': SimpleJobScraper()
         }
         
         # Configuration
@@ -52,12 +52,10 @@ class JobScraperWorker:
             
             try:
                 # Scrape from Craigslist
-                self.scrapers['craigslist'].scrape_jobs(
+                jobs = self.scrapers['craigslist'].scrape_jobs(
                     city=city,
-                    category='jjj',
-                    max_pages=1
+                    max_jobs=self.max_jobs_per_city
                 )
-                jobs = self.scrapers['craigslist'].jobs_data
                 
                 # Save jobs to database
                 jobs_added = 0
