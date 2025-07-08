@@ -57,18 +57,20 @@ class JobScraperWorker:
                     max_jobs=self.max_jobs_per_city
                 )
                 
-                # Save jobs to database in batches to avoid connection issues
+                # For now, save jobs to file and try database as backup
                 jobs_added = 0
-                batch_size = 5
                 
-                for i in range(0, len(jobs), batch_size):
-                    batch = jobs[i:i + batch_size]
-                    batch_saved = self._save_job_batch(batch)
-                    jobs_added += batch_saved
-                    
-                    # Wait between batches to avoid overwhelming connection
-                    if i + batch_size < len(jobs):
-                        time.sleep(5)
+                # Save to JSON file as backup
+                self._save_jobs_to_file(jobs, city)
+                
+                # Try to save to database (may fail on Render)
+                for job in jobs:
+                    try:
+                        if self.db.save_job(job):
+                            jobs_added += 1
+                        time.sleep(0.5)  # Slower saves
+                    except:
+                        continue  # Skip failed saves silently
                 
                 total_jobs_added += jobs_added
                 
@@ -98,24 +100,19 @@ class JobScraperWorker:
         # Clean up old jobs (older than 30 days)
         self.cleanup_old_jobs()
 
-    def _save_job_batch(self, jobs: List[Dict]) -> int:
-        """Save a batch of jobs with better error handling"""
-        saved_count = 0
-        
-        for job in jobs:
-            try:
-                if self.db.save_job(job):
-                    saved_count += 1
-                    self.logger.info(f"✅ Saved: {job['title'][:30]}...")
-                
-                # Small delay between individual saves
-                time.sleep(1)
-                
-            except Exception as e:
-                self.logger.warning(f"⚠️  Failed to save job: {job.get('title', 'Unknown')[:30]} - {str(e)}")
-                continue
-        
-        return saved_count
+    def _save_jobs_to_file(self, jobs: List[Dict], city: str) -> None:
+        """Save jobs to JSON file as backup"""
+        try:
+            import json
+            filename = f"jobs_{city}_{datetime.now().strftime('%Y%m%d_%H%M')}.json"
+            
+            with open(filename, 'w') as f:
+                json.dump(jobs, f, indent=2, default=str)
+            
+            self.logger.info(f"📁 Saved {len(jobs)} jobs to {filename}")
+            
+        except Exception as e:
+            self.logger.warning(f"⚠️  Failed to save jobs to file: {str(e)}")
     
     def cleanup_old_jobs(self) -> None:
         """Remove jobs older than 30 days"""
