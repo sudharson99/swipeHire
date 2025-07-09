@@ -200,11 +200,73 @@ class SwipeHire {
         return '';
     }
 
+    openEmailApplication(job) {
+        const subject = encodeURIComponent(`Application for ${job.title} - ${job.company}`);
+        const body = encodeURIComponent(`Dear Hiring Manager,
+
+I am writing to express my interest in the ${job.title} position at ${job.company} that I found on your job posting.
+
+${job.description ? 'I am particularly interested in this role because of the opportunity to ' + job.description.substring(0, 100) + '...' : 'I believe my skills and experience would be a great fit for this position.'}
+
+I would welcome the opportunity to discuss how my background can contribute to your team. Please find my resume attached, and I look forward to hearing from you.
+
+Best regards,
+[Your Name]
+[Your Phone Number]
+
+---
+Original Job Posting: ${job.job_url || 'N/A'}
+Location: ${job.location}
+${job.salary ? 'Salary: ' + job.salary : ''}
+        `);
+
+        const mailtoLink = `mailto:${job.contact_email}?subject=${subject}&body=${body}`;
+        
+        // Open email client
+        window.open(mailtoLink, '_blank');
+        
+        // Log application for analytics
+        console.log('📧 Email application opened for:', job.title, 'at', job.company);
+        
+        // Show success message
+        this.showApplicationSuccess(job);
+    }
+
+    showApplicationSuccess(job) {
+        // Create temporary success message
+        const successMsg = document.createElement('div');
+        successMsg.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #28a745;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            z-index: 1000;
+            font-weight: bold;
+        `;
+        successMsg.innerHTML = `✅ Email opened for ${job.title}!`;
+        
+        document.body.appendChild(successMsg);
+        
+        // Remove after 3 seconds
+        setTimeout(() => {
+            document.body.removeChild(successMsg);
+        }, 3000);
+    }
+
     swipeLeft() {
         this.performSwipe('left');
     }
 
     swipeRight() {
+        const currentJob = this.jobs[this.currentJobIndex];
+        if (currentJob && currentJob.contact_email) {
+            this.openEmailApplication(currentJob);
+        }
         this.performSwipe('right');
     }
 
