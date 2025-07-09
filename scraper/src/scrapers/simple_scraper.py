@@ -171,16 +171,23 @@ class SimpleJobScraper:
                 details['description'] = self._clean_description(description[:300] + '...' if len(description) > 300 else description)
                 details['full_description'] = self._clean_description(description)
             
-            # Extract contact info from description
-            if description_elem:
+            # Extract contact email from reply button (primary method)
+            reply_email = self._extract_reply_email(soup)
+            if reply_email:
+                details['email'] = reply_email
+            
+            # Extract contact info from description (fallback method)
+            if description_elem and not details.get('email'):
                 text = description_elem.get_text()
                 
-                # Email extraction
+                # Email extraction from description text
                 email_match = re.search(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', text)
                 if email_match:
                     details['email'] = email_match.group()
-                
-                # Phone extraction
+            
+            # Phone extraction from description
+            if description_elem:
+                text = description_elem.get_text()
                 phone_match = re.search(r'(\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})', text)
                 if phone_match:
                     details['phone'] = phone_match.group()
@@ -275,3 +282,44 @@ class SimpleJobScraper:
             return 'mid'
         else:
             return 'mid'  # Default
+
+    def _extract_reply_email(self, soup) -> Optional[str]:
+        """Extract email from Craigslist reply button or mailto links"""
+        try:
+            # Method 1: Look for reply button with mailto link
+            reply_button = soup.find('a', href=re.compile(r'mailto:', re.I))
+            if reply_button and reply_button.get('href'):
+                href = reply_button.get('href')
+                # Extract email from mailto: link
+                email_match = re.search(r'mailto:([^?&\s]+)', href, re.I)
+                if email_match:
+                    return email_match.group(1).strip()
+            
+            # Method 2: Look for reply button class/id patterns
+            reply_elements = soup.find_all(['a', 'button'], 
+                                         attrs={'class': re.compile(r'reply|contact', re.I)})
+            for element in reply_elements:
+                href = element.get('href', '')
+                if 'mailto:' in href.lower():
+                    email_match = re.search(r'mailto:([^?&\s]+)', href, re.I)
+                    if email_match:
+                        return email_match.group(1).strip()
+            
+            # Method 3: Look for data attributes that might contain emails
+            for element in soup.find_all(attrs={'data-email': True}):
+                email = element.get('data-email')
+                if email and '@' in email:
+                    return email.strip()
+            
+            # Method 4: Look in onclick handlers or JavaScript for emails
+            for element in soup.find_all(attrs={'onclick': True}):
+                onclick = element.get('onclick', '')
+                email_match = re.search(r'([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})', onclick)
+                if email_match:
+                    return email_match.group(1).strip()
+                    
+            return None
+            
+        except Exception as e:
+            self.logger.warning(f"⚠️  Error extracting reply email: {str(e)}")
+            return None
