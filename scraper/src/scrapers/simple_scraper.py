@@ -295,17 +295,18 @@ class SimpleJobScraper:
                 if email_match:
                     email = email_match.group(1).strip()
                     
-                    # Check if it's a Craigslist anonymized email
-                    if '@job.craigslist.org' in email.lower():
-                        # Try to get the real email using the reply endpoint
-                        real_email = self._get_real_email_from_craigslist(email, reply_button)
-                        if real_email:
-                            return real_email
-                    else:
-                        # Direct email found
-                        return email
+                    # Craigslist anonymized emails work fine - just return them
+                    return email
             
-            # Method 2: Look for reply button class/id patterns
+            # Method 2: Look for reply button with data-href
+            reply_button = soup.find('button', class_='reply-button')
+            if reply_button and reply_button.get('data-href'):
+                data_href = reply_button.get('data-href')
+                email = self._get_email_from_reply_endpoint(data_href, soup)
+                if email:
+                    return email
+            
+            # Method 3: Look for other reply/contact button patterns
             reply_elements = soup.find_all(['a', 'button'], 
                                          attrs={'class': re.compile(r'reply|contact', re.I)})
             for element in reply_elements:
@@ -314,12 +315,7 @@ class SimpleJobScraper:
                     email_match = re.search(r'mailto:([^?&\s]+)', href, re.I)
                     if email_match:
                         email = email_match.group(1).strip()
-                        if '@job.craigslist.org' in email.lower():
-                            real_email = self._get_real_email_from_craigslist(email, element)
-                            if real_email:
-                                return real_email
-                        else:
-                            return email
+                        return email
             
             # Method 3: Look for data attributes that might contain emails
             for element in soup.find_all(attrs={'data-email': True}):
@@ -340,79 +336,61 @@ class SimpleJobScraper:
             self.logger.warning(f"⚠️  Error extracting reply email: {str(e)}")
             return None
 
-    def _get_real_email_from_craigslist(self, anonymized_email: str, reply_element) -> Optional[str]:
-        """Try to get the real email from Craigslist anonymized email"""
+    def _get_email_from_reply_endpoint(self, data_href: str, original_soup) -> Optional[str]:
+        """Get email from Craigslist reply endpoint using data-href"""
         try:
             import time
             
-            # Look for reply link or contact link
-            reply_href = reply_element.get('href', '')
-            if not reply_href:
-                return None
+            # Extract base URL from the original job page
+            base_url = "https://vancouver.craigslist.org"  # Default, should extract from original URL
             
-            # Extract the job ID or reply ID from the href
-            # Craigslist reply links often contain the post ID
-            post_id_match = re.search(r'/(\d+)\.html', reply_href)
-            if not post_id_match:
-                return None
+            # Clean up data_href and replace __SERVICE_ID__ placeholder
+            # The __SERVICE_ID__ might need to be replaced with an actual service ID
+            if '__SERVICE_ID__' in data_href:
+                # Try without the service ID first
+                data_href = data_href.replace('/__SERVICE_ID__', '')
             
-            post_id = post_id_match.group(1)
+            # Construct full reply URL
+            reply_url = base_url + data_href
             
-            # Try to find the reply endpoint URL
-            # Craigslist typically has reply forms at specific endpoints
-            base_url = reply_href.split('/')[0:3]  # Get https://vancouver.craigslist.org
-            base_url = '/'.join(base_url)
+            self.logger.debug(f"Trying reply endpoint: {reply_url}")
             
-            # Common Craigslist reply endpoint patterns
-            reply_endpoints = [
-                f"{base_url}/reply/van/{post_id}",
-                f"{base_url}/reply/{post_id}",
-                f"{base_url}/replyto/{post_id}"
-            ]
+            # Make request to reply endpoint
+            response = requests.get(reply_url, headers=self.headers, timeout=10)
             
-            for endpoint in reply_endpoints:
-                try:
-                    # Make request to reply endpoint
-                    headers = self._get_headers()
-                    response = requests.get(endpoint, headers=headers, timeout=10)
-                    
-                    if response.status_code == 200:
-                        reply_soup = BeautifulSoup(response.content, 'html.parser')
-                        
-                        # Look for the real email in various places
-                        # Check for email in form fields
-                        email_inputs = reply_soup.find_all('input', {'type': 'email'})
-                        for input_elem in email_inputs:
-                            value = input_elem.get('value', '')
-                            if value and '@' in value and '@job.craigslist.org' not in value:
-                                return value.strip()
-                        
-                        # Check for email in text content
-                        text_content = reply_soup.get_text()
-                        email_matches = re.findall(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', text_content)
-                        for email in email_matches:
-                            if '@job.craigslist.org' not in email.lower():
-                                return email.strip()
-                        
-                        # Check for mailto links with real emails
-                        mailto_links = reply_soup.find_all('a', href=re.compile(r'mailto:', re.I))
-                        for link in mailto_links:
-                            href = link.get('href', '')
-                            email_match = re.search(r'mailto:([^?&\s]+)', href, re.I)
-                            if email_match:
-                                email = email_match.group(1).strip()
-                                if '@job.craigslist.org' not in email.lower():
-                                    return email
-                    
-                    # Rate limiting
-                    time.sleep(1)
-                    
-                except Exception as e:
-                    self.logger.debug(f"Failed to fetch reply endpoint {endpoint}: {str(e)}")
-                    continue
+            if response.status_code == 200:
+                reply_soup = BeautifulSoup(response.content, 'html.parser')
+                
+                # Look for mailto links in the reply page
+                mailto_links = reply_soup.find_all('a', href=re.compile(r'mailto:', re.I))
+                for link in mailto_links:
+                    href = link.get('href', '')
+                    email_match = re.search(r'mailto:([^?&\s]+)', href, re.I)
+                    if email_match:
+                        email = email_match.group(1).strip()
+                        self.logger.info(f"✅ Found reply email: {email}")
+                        return email
+                
+                # Look for emails in JavaScript or page content
+                page_text = response.text
+                
+                # Look for Craigslist anonymized emails
+                cl_email_matches = re.findall(r'[a-f0-9]{32}@job\.craigslist\.org', page_text)
+                if cl_email_matches:
+                    email = cl_email_matches[0]
+                    self.logger.info(f"✅ Found Craigslist anonymized email: {email}")
+                    return email
+                
+                # Look for any other email patterns
+                email_matches = re.findall(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', page_text)
+                for email in email_matches:
+                    if 'craigslist.org' not in email.lower() or '@job.craigslist.org' in email.lower():
+                        self.logger.info(f"✅ Found email in reply page: {email}")
+                        return email
             
             return None
             
         except Exception as e:
-            self.logger.warning(f"⚠️  Error getting real email from Craigslist: {str(e)}")
+            self.logger.warning(f"⚠️  Error getting email from reply endpoint: {str(e)}")
             return None
+
