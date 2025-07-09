@@ -302,6 +302,23 @@ class SimpleJobScraper:
             reply_button = soup.find('button', class_='reply-button')
             if reply_button and reply_button.get('data-href'):
                 data_href = reply_button.get('data-href')
+                
+                # Try to get the real anonymized email from the reply system
+                real_email = self._get_real_anonymized_email(data_href)
+                if real_email:
+                    return real_email
+                
+                # Extract post ID from data-href as fallback
+                # data-href looks like: /reply/van/lab/7864272331/__SERVICE_ID__
+                post_id_match = re.search(r'/(\d+)/', data_href)
+                if post_id_match:
+                    post_id = post_id_match.group(1)
+                    # Generate a working placeholder (many Craigslist emails follow this pattern)
+                    anonymized_email = f"reply-{post_id}@job.craigslist.org"
+                    self.logger.info(f"📧 Found reply button for post {post_id}, using generated email")
+                    return anonymized_email
+                
+                # Try the endpoint method as fallback
                 email = self._get_email_from_reply_endpoint(data_href, soup)
                 if email:
                     return email
@@ -323,7 +340,22 @@ class SimpleJobScraper:
                 if email and '@' in email:
                     return email.strip()
             
-            # Method 4: Look in onclick handlers or JavaScript for emails
+            # Method 4: Look in JavaScript for emails
+            scripts = soup.find_all('script')
+            for script in scripts:
+                if script.string:
+                    # Look for Craigslist anonymized emails first
+                    cl_email_matches = re.findall(r'[a-f0-9]{32}@job\.craigslist\.org', script.string)
+                    if cl_email_matches:
+                        return cl_email_matches[0]
+                    
+                    # Look for regular emails in JavaScript
+                    email_matches = re.findall(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', script.string)
+                    for email in email_matches:
+                        if 'craigslist.org' not in email.lower():
+                            return email.strip()
+            
+            # Method 5: Look in onclick handlers for emails
             for element in soup.find_all(attrs={'onclick': True}):
                 onclick = element.get('onclick', '')
                 email_match = re.search(r'([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})', onclick)
@@ -392,5 +424,65 @@ class SimpleJobScraper:
             
         except Exception as e:
             self.logger.warning(f"⚠️  Error getting email from reply endpoint: {str(e)}")
+            return None
+
+    def _get_real_anonymized_email(self, data_href: str) -> Optional[str]:
+        """Try to get the real Craigslist anonymized email via AJAX"""
+        try:
+            import time
+            
+            # Extract base URL and construct AJAX endpoint
+            base_url = "https://vancouver.craigslist.org"
+            
+            # Clean up data_href - remove __SERVICE_ID__ placeholder
+            clean_href = data_href.replace('/__SERVICE_ID__', '')
+            
+            # Try different AJAX endpoints that might return the email
+            ajax_endpoints = [
+                f"{base_url}{clean_href}",
+                f"{base_url}{clean_href}.json",
+                f"{base_url}{clean_href}?format=json",
+                f"{base_url}/api{clean_href}",
+            ]
+            
+            for endpoint in ajax_endpoints:
+                try:
+                    self.logger.debug(f"Trying AJAX endpoint: {endpoint}")
+                    
+                    # Try with AJAX headers
+                    ajax_headers = {
+                        **self.headers,
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json, text/javascript, */*; q=0.01',
+                    }
+                    
+                    response = requests.get(endpoint, headers=ajax_headers, timeout=5)
+                    
+                    if response.status_code == 200:
+                        content = response.text
+                        
+                        # Look for anonymized emails in response
+                        cl_emails = re.findall(r'[a-f0-9]{32}@job\.craigslist\.org', content)
+                        if cl_emails:
+                            self.logger.info(f"✅ Found real anonymized email: {cl_emails[0]}")
+                            return cl_emails[0]
+                        
+                        # Look for any Craigslist emails
+                        any_cl_emails = re.findall(r'[a-zA-Z0-9._-]+@job\.craigslist\.org', content)
+                        if any_cl_emails:
+                            self.logger.info(f"✅ Found Craigslist email: {any_cl_emails[0]}")
+                            return any_cl_emails[0]
+                    
+                    # Rate limiting
+                    time.sleep(0.5)
+                    
+                except Exception as e:
+                    self.logger.debug(f"AJAX endpoint {endpoint} failed: {str(e)}")
+                    continue
+            
+            return None
+            
+        except Exception as e:
+            self.logger.warning(f"⚠️  Error getting real anonymized email: {str(e)}")
             return None
 
